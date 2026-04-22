@@ -1,0 +1,9 @@
+#ifndef ADC_CONFIG_H
+#define ADC_CONFIG_H
+
+/* Default ADC Configuration */
+#define ADC_DEFAULT_CHANNEL ADC_CHANNEL0
+#define ADC_DEFAULT_REF ADC_REF_VSS_VDD
+#define ADC_DEFAULT_PRESCALER ADC_PRESCALER_8
+
+#endif

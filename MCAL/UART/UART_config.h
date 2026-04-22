@@ -1,0 +1,9 @@
+#ifndef UART_CONFIG_H
+#define UART_CONFIG_H
+
+/* Default UART Configuration */
+#define UART_DEFAULT_BAUD UART_BAUD_9600
+#define UART_DEFAULT_BITS UART_DATA_8BITS
+#define UART_DEFAULT_STOP UART_STOP_1BIT
+
+#endif
