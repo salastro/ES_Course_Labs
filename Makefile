@@ -54,7 +54,7 @@ $(TARGET).hex: $(SRCS)
 
 # Flash with HS fuse for 4-16MHz oscillator
 flash: $(TARGET).hex
-    picpro program -p /dev/ttyUSB0 -i $(TARGET).hex -t $(MCU) --fuse=FOSC:HS
+	picpro program -p /dev/ttyUSB0 -i $(TARGET).hex -t $(MCU) '--fuse=FOSC:HS'
 
 # Clean
 clean:
