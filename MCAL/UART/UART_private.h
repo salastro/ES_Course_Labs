@@ -35,6 +35,6 @@
 #define RCIE 5
 #define TXIE 4
 
-#define UART_FOSC 4000000UL
+#define UART_FOSC 16000000UL
 
 #endif

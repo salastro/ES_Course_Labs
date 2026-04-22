@@ -41,6 +41,6 @@
 
 #define SSPI 3
 
-#define I2C_FOSC 4000000UL
+#define I2C_FOSC 16000000UL
 
 #endif

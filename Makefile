@@ -39,8 +39,11 @@ INCLUDES = \
 -IMCAL/I2C \
 -ISERVICES
 
+# Oscillator Configuration
+FOSC_HZ = 16000000UL
+
 # Flags
-CFLAGS = -mcpu=$(MCU) -mdfp=$(DFP) $(INCLUDES)
+CFLAGS = -mcpu=$(MCU) -mdfp=$(DFP) -DFOSC=$(FOSC_HZ) $(INCLUDES)
 
 # Default target
 all: $(TARGET).hex
@@ -49,9 +52,9 @@ all: $(TARGET).hex
 $(TARGET).hex: $(SRCS)
 	$(CC) $(CFLAGS) -o $(TARGET).hex $(SRCS)
 
-# Flash (PICkit2)
+# Flash with HS fuse for 4-16MHz oscillator
 flash: $(TARGET).hex
-	picpro program -p /dev/ttyUSB0 -i $(TARGET).hex -t $(MCU)
+    picpro program -p /dev/ttyUSB0 -i $(TARGET).hex -t $(MCU) --fuse=FOSC:HS
 
 # Clean
 clean:
