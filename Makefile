@@ -51,7 +51,7 @@ $(TARGET).hex: $(SRCS)
 
 # Flash (PICkit2)
 flash: $(TARGET).hex
-	pk2cmd -P$(MCU) -F$(TARGET).hex -M
+	picpro program -p /dev/ttyUSB0 -i $(TARGET).hex -t $(MCU)
 
 # Clean
 clean:
