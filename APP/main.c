@@ -13,17 +13,15 @@ void delay_ms(u16 ms)
 void main(void)
 {
     // Initialize GPIO for LED
+    GPIO_Init();
     GPIO_SetPinDirection(GPIO_PORTB, GPIO_PIN0, GPIO_OUTPUT);
     GPIO_SetPinValue(GPIO_PORTB, GPIO_PIN0, GPIO_LOW);
 
+    // Turn LED on and keep it on
+    LED_On(GPIO_PORTB, GPIO_PIN0);
+
     while (1)
     {
-        // Turn LED on
-        LED_On(GPIO_PORTB, GPIO_PIN0);
-        delay_ms(1000);
-
-        // Turn LED off
-        LED_Off(GPIO_PORTB, GPIO_PIN0);
-        delay_ms(1000);
+        // Keep running (LED stays on)
     }
 }
