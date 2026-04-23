@@ -10,7 +10,7 @@ void delay_ms(u16 ms)
             ;
 }
 
-void main(void)
+int main(void)
 {
     // Initialize GPIO for LED
     GPIO_Init();
@@ -24,4 +24,6 @@ void main(void)
     {
         // Keep running (LED stays on)
     }
+
+    return 0;
 }

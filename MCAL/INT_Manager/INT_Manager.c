@@ -31,7 +31,8 @@ extern void UART_InterruptHandler(void);
 extern void SPI_InterruptHandler(void);
 extern void I2C_InterruptHandler(void);
 
-void __interrupt() ISR_Handler(void)
+#pragma interrupt ISR_Handler
+void ISR_Handler(void)
 {
     if (GET_BIT(INTCON, INTF))
     {

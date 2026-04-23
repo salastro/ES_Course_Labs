@@ -6,13 +6,13 @@
 static UART_RX_CallbackFuncPtr UART_RXCallbackFunc = NULL_PTR;
 static UART_TX_CallbackFuncPtr UART_TXCallbackFunc = NULL_PTR;
 
-void UART_Init(u16 BaudRate, u8 DataBits, u8 StopBits)
+void UART_Init(u16 BaudRate, u8 DataBits, u8 StopBits __attribute__((unused)))
 {
     u16 Local_SPBRValue = 0;
     u8 Local_RCSTA = 0;
     u8 Local_TXSTA = 0;
 
-    Local_SPBRValue = (UART_FOSC / (16 * (u32)BaudRate)) - 1;
+    Local_SPBRValue = (u16)((UART_FOSC / (16 * (u32)BaudRate)) - 1);
     SPBRG = (u8)Local_SPBRValue;
 
     Local_TXSTA = 0x24;
