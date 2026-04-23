@@ -104,7 +104,7 @@ void ADC_SelectChannel(u8 Channel)
 {
     u8 Local_ADCON0 = ADCON0;
 
-    Local_ADCON0 = (Local_ADCON0 & 0xC7) | ((Channel & 0x07) << 3);
+    Local_ADCON0 = (u8)((Local_ADCON0 & 0xC7) | ((Channel & 0x07) << 3));
 
     ADCON0 = Local_ADCON0;
 }

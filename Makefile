@@ -40,7 +40,7 @@ INCLUDES = \
 -ISERVICES
 
 # Flags
-CFLAGS = -mcpu=$(MCU) -mdfp=$(DFP) $(INCLUDES)
+CFLAGS = -mcpu=$(MCU) -mdfp=$(DFP) $(INCLUDES) -Wall -Wextra -Werror=conversion -Werror=unused-parameter
 
 # Default target
 all: $(TARGET).hex
