@@ -14,6 +14,7 @@ TARGET = app
 SRCS = \
 APP/main.c \
 HAL/LED/LED.c \
+HAL/DC_MOTOR/DC_MOTOR.c \
 MCAL/GPIO/GPIO.c \
 MCAL/INT/INT.c \
 MCAL/INT_Manager/INT_Manager.c \
@@ -28,6 +29,7 @@ MCAL/I2C/I2C.c
 INCLUDES = \
 -IAPP \
 -IHAL/LED \
+-IHAL/DC_MOTOR \
 -IMCAL/GPIO \
 -IMCAL/INT \
 -IMCAL/INT_Manager \

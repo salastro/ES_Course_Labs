@@ -10,8 +10,9 @@
 
 #define _XTAL_FREQ 16000000
 
-#include "../HAL/LED/LED_interface.h"
 #include "../MCAL/GPIO/GPIO_interface.h"
+#include "../HAL/DC_MOTOR/DC_MOTOR_interface.h"
+#include "../MCAL/PWM/PWM_interface.h"
 #include "../SERVICES/STD_TYPES.h"
 #include "../MCAL/ADC/ADC_private.h"
 
@@ -28,23 +29,38 @@ void delay_ms(u16 ms)
     }
 }
 
+static DCMOTOR_t LeftMotor = {
+    GPIO_PORTD, GPIO_PIN0,
+    GPIO_PORTD, GPIO_PIN1,
+    GPIO_PORTC, GPIO_PIN2,
+    DCMOTOR_USE_PWM,
+    PWM_CHANNEL1};
 
+static DCMOTOR_t RightMotor = {
+    GPIO_PORTD, GPIO_PIN2,
+    GPIO_PORTD, GPIO_PIN3,
+    GPIO_PORTC, GPIO_PIN1,
+    DCMOTOR_USE_PWM,
+    PWM_CHANNEL2};
 
 int main(void)
 {
-    /* Ensure analog pins are configured as digital (PIC16F877A) */
-    ADCON1 = 0x07; /* All ports digital (adjust if your hardware needs different value) */
-    // Initialize GPIO for LED
-    GPIO_Init();
-    GPIO_SetPinDirection(GPIO_PORTB, GPIO_PIN0, GPIO_OUTPUT);
-    GPIO_SetPinValue(GPIO_PORTB, GPIO_PIN0, GPIO_LOW);
+    u8 MotorSpeed = 75U;
 
-    // Turn LED on and keep it on
-    LED_On(GPIO_PORTB, GPIO_PIN0);
+    GPIO_Init();
+
+    DCMOTOR_Init(&LeftMotor);
+    DCMOTOR_Init(&RightMotor);
 
     while (1)
     {
-        // Keep running (LED stays on)
+        DCMOTOR_Forward(&LeftMotor, MotorSpeed);
+        DCMOTOR_Forward(&RightMotor, MotorSpeed);
+        delay_ms(5000U);
+
+        DCMOTOR_Reverse(&LeftMotor, MotorSpeed);
+        DCMOTOR_Reverse(&RightMotor, MotorSpeed);
+        delay_ms(5000U);
     }
 
     return 0;
