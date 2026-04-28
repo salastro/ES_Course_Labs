@@ -49,7 +49,6 @@ all: $(TARGET).hex
 $(TARGET).hex: $(SRCS)
 	$(CC) $(CFLAGS) -o $(TARGET).hex $(SRCS)
 
-# Flash with HS fuse for 4-16MHz oscillator
 flash: $(TARGET).hex
 	picpro program -p /dev/ttyUSB0 -i $(TARGET).hex -t $(MCU)
 
