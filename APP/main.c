@@ -13,18 +13,23 @@
 #include "../MCAL/GPIO/GPIO_interface.h"
 #include "../HAL/DC_MOTOR/DC_MOTOR_interface.h"
 #include "../MCAL/PWM/PWM_interface.h"
+#include "../MCAL/TIMER0/TIMER0_interface.h"
+#include "../MCAL/TIMER0/TIMER0_private.h"
+#include "../SERVICES/BIT_MATH.h"
 #include "../SERVICES/STD_TYPES.h"
-#include "../MCAL/ADC/ADC_private.h"
 
 void delay_ms(u16 ms)
 {
-    unsigned int i, j;
-    for (i = 0; i < ms; i++)
+    u16 i = 0U;
+
+    for (i = 0U; i < ms; i++)
     {
-        const unsigned int iterations = 16000 / 4;
-        for (j = 0; j < iterations; j++)
+        TMR0 = 131U;
+        CLR_BIT(INTCON, T0IF);
+
+        while (GET_BIT(INTCON, T0IF) == 0U)
         {
-            // This loop creates a delay of approximately 1 ms at 16 MHz
+            ;
         }
     }
 }
@@ -45,9 +50,10 @@ static DCMOTOR_t RightMotor = {
 
 int main(void)
 {
-    u8 MotorSpeed = 75U;
+    u8 MotorSpeed = 25U;
 
     GPIO_Init();
+    TIMER0_Init(TIMER0_TIMER_MODE, TIMER0_PRESCALER_32, TIMER0_INT_DISABLE);
 
     DCMOTOR_Init(&LeftMotor);
     DCMOTOR_Init(&RightMotor);
@@ -56,11 +62,15 @@ int main(void)
     {
         DCMOTOR_Forward(&LeftMotor, MotorSpeed);
         DCMOTOR_Forward(&RightMotor, MotorSpeed);
-        delay_ms(5000U);
+        delay_ms(1000U);
 
         DCMOTOR_Reverse(&LeftMotor, MotorSpeed);
         DCMOTOR_Reverse(&RightMotor, MotorSpeed);
-        delay_ms(5000U);
+        delay_ms(1000U);
+
+        DCMOTOR_Stop(&LeftMotor);
+        DCMOTOR_Stop(&RightMotor);
+        delay_ms(1000U);
     }
 
     return 0;
