@@ -49,12 +49,20 @@ static ULTRASONIC_t FrontSensor = {
 
 #define OBSTACLE_DISTANCE_CM 10U
 
+#define LED_PORT GPIO_PORTB
+#define LED_PIN GPIO_PIN0
+
 int main(void)
 {
     u8 MotorSpeed = 75U;
     u16 DistanceCm = 0U;
 
+    // Initialize GPIO, motors, and ultrasonic sensor
     GPIO_Init();
+
+    // LED for debugging
+    GPIO_SetPinDirection(LED_PORT, LED_PIN, GPIO_OUTPUT);
+    GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_LOW);
 
     DCMOTOR_Init(&LeftMotor);
     DCMOTOR_Init(&RightMotor);
@@ -68,11 +76,15 @@ int main(void)
         {
             DCMOTOR_Stop(&LeftMotor);
             DCMOTOR_Stop(&RightMotor);
+            // DCMOTOR_Forward(&LeftMotor, 0);
+            // DCMOTOR_Forward(&RightMotor, 0);
+            GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_HIGH); // Turn on LED when obstacle is detected
         }
         else
         {
             DCMOTOR_Forward(&LeftMotor, MotorSpeed);
             DCMOTOR_Forward(&RightMotor, MotorSpeed);
+            GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_LOW); // Turn off LED when no obstacle is detected
         }
 
     }
