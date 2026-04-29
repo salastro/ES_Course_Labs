@@ -12,9 +12,9 @@
 
 #include "../MCAL/GPIO/GPIO_interface.h"
 #include "../HAL/DC_MOTOR/DC_MOTOR_interface.h"
+#include "../HAL/ULTRASONIC/ULTRASONIC_interface.h"
 #include "../MCAL/PWM/PWM_interface.h"
 #include "../SERVICES/STD_TYPES.h"
-#include "../MCAL/ADC/ADC_private.h"
 
 void delay_ms(u16 ms)
 {
@@ -30,37 +30,51 @@ void delay_ms(u16 ms)
 }
 
 static DCMOTOR_t LeftMotor = {
-    GPIO_PORTD, GPIO_PIN0,
-    GPIO_PORTD, GPIO_PIN1,
+    GPIO_PORTD, GPIO_PIN0, // In1
+    GPIO_PORTD, GPIO_PIN1, // In2
     GPIO_PORTC, GPIO_PIN2,
     DCMOTOR_USE_PWM,
     PWM_CHANNEL1};
 
 static DCMOTOR_t RightMotor = {
-    GPIO_PORTD, GPIO_PIN2,
-    GPIO_PORTD, GPIO_PIN3,
+    GPIO_PORTD, GPIO_PIN2, // In3
+    GPIO_PORTD, GPIO_PIN3, // In4
     GPIO_PORTC, GPIO_PIN1,
     DCMOTOR_USE_PWM,
     PWM_CHANNEL2};
 
+static ULTRASONIC_t FrontSensor = {
+    GPIO_PORTB, GPIO_PIN4, // Trigger
+    GPIO_PORTB, GPIO_PIN5}; // Echo
+
+#define OBSTACLE_DISTANCE_CM 10U
+
 int main(void)
 {
     u8 MotorSpeed = 75U;
+    u16 DistanceCm = 0U;
 
     GPIO_Init();
 
     DCMOTOR_Init(&LeftMotor);
     DCMOTOR_Init(&RightMotor);
+    ULTRASONIC_Init(&FrontSensor);
 
     while (1)
     {
-        DCMOTOR_Forward(&LeftMotor, MotorSpeed);
-        DCMOTOR_Forward(&RightMotor, MotorSpeed);
-        delay_ms(5000U);
+        DistanceCm = ULTRASONIC_GetDistanceCm(&FrontSensor);
 
-        DCMOTOR_Reverse(&LeftMotor, MotorSpeed);
-        DCMOTOR_Reverse(&RightMotor, MotorSpeed);
-        delay_ms(5000U);
+        if ((DistanceCm != 0U) && (DistanceCm >= OBSTACLE_DISTANCE_CM))
+        {
+            DCMOTOR_Stop(&LeftMotor);
+            DCMOTOR_Stop(&RightMotor);
+        }
+        else
+        {
+            DCMOTOR_Forward(&LeftMotor, MotorSpeed);
+            DCMOTOR_Forward(&RightMotor, MotorSpeed);
+        }
+
     }
 
     return 0;
