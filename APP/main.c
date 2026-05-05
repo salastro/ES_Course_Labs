@@ -72,7 +72,7 @@ int main(void)
     {
         DistanceCm = ULTRASONIC_GetDistanceCm(&FrontSensor);
 
-        if ((DistanceCm != 0U) && (DistanceCm >= OBSTACLE_DISTANCE_CM))
+        if ((DistanceCm != 0U) && (DistanceCm <= OBSTACLE_DISTANCE_CM))
         {
             DCMOTOR_Stop(&LeftMotor);
             DCMOTOR_Stop(&RightMotor);
