@@ -76,8 +76,6 @@ int main(void)
         {
             DCMOTOR_Stop(&LeftMotor);
             DCMOTOR_Stop(&RightMotor);
-            // DCMOTOR_Forward(&LeftMotor, 0);
-            // DCMOTOR_Forward(&RightMotor, 0);
             GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_HIGH); // Turn on LED when obstacle is detected
         }
         else
