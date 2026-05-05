@@ -15,6 +15,8 @@
 #include "../HAL/ULTRASONIC/ULTRASONIC_interface.h"
 #include "../MCAL/PWM/PWM_interface.h"
 #include "../SERVICES/STD_TYPES.h"
+#include "CAR/CAR_config.h"
+#include "CAR/CAR_interface.h"
 
 void delay_ms(u16 ms)
 {
@@ -47,17 +49,38 @@ static ULTRASONIC_t FrontSensor = {
     GPIO_PORTB, GPIO_PIN4, // Trigger
     GPIO_PORTB, GPIO_PIN5}; // Echo
 
-#define OBSTACLE_DISTANCE_CM 10U
+static ULTRASONIC_t BackSensor = {
+    GPIO_PORTB, GPIO_PIN6, // Trigger
+    GPIO_PORTB, GPIO_PIN7}; // Echo
+
+static ULTRASONIC_t LeftSensor = {
+    GPIO_PORTA, GPIO_PIN0, // Trigger
+    GPIO_PORTA, GPIO_PIN1}; // Echo
+
+static ULTRASONIC_t RightSensor = {
+    GPIO_PORTA, GPIO_PIN2, // Trigger
+    GPIO_PORTA, GPIO_PIN3}; // Echo
+
 
 #define LED_PORT GPIO_PORTB
 #define LED_PIN GPIO_PIN0
 
+// TODO: Debounce ultrasonic
+
 int main(void)
 {
-    u8 MotorSpeed = 75U;
-    u16 DistanceCm = 0U;
+    // Initial motor speed and state variables
+    const u8 MotorSpeed = 100U;
+    const u8 StopSpeed = 0U;
+    u8 CurrentSpeed = MotorSpeed;
+    u16 FrontDistanceCm = 0U;
+    u16 BackDistanceCm = 0U;
+    u16 LeftDistanceCm = 0U;
+    u16 RightDistanceCm = 0U;
+    u16 ClosestDistanceCm = 0U;
+    u8 ObstacleState = CAR_OBSTACLE_STATE_CLEAR;
 
-    // Initialize GPIO, motors, and ultrasonic sensor
+    // Initialize GPIO, motors, and ultrasonic sensors
     GPIO_Init();
 
     // LED for debugging
@@ -67,26 +90,63 @@ int main(void)
     DCMOTOR_Init(&LeftMotor);
     DCMOTOR_Init(&RightMotor);
     ULTRASONIC_Init(&FrontSensor);
+    ULTRASONIC_Init(&BackSensor);
+    ULTRASONIC_Init(&LeftSensor);
+    ULTRASONIC_Init(&RightSensor);
+
+    DCMOTOR_Forward(&LeftMotor, CurrentSpeed);
+    DCMOTOR_Forward(&RightMotor, CurrentSpeed);
 
     while (1)
     {
-        DistanceCm = ULTRASONIC_GetDistanceCm(&FrontSensor);
+        FrontDistanceCm = ULTRASONIC_GetDistanceCm(&FrontSensor);
+        BackDistanceCm = ULTRASONIC_GetDistanceCm(&BackSensor);
+        LeftDistanceCm = ULTRASONIC_GetDistanceCm(&LeftSensor);
+        RightDistanceCm = ULTRASONIC_GetDistanceCm(&RightSensor);
 
-        if ((DistanceCm != 0U) && (DistanceCm <= OBSTACLE_DISTANCE_CM))
+        ClosestDistanceCm = FrontDistanceCm;
+
+        if ((BackDistanceCm != 0U) && ((ClosestDistanceCm == 0U) || (BackDistanceCm < ClosestDistanceCm)))
         {
-            DCMOTOR_Stop(&LeftMotor);
-            DCMOTOR_Stop(&RightMotor);
-            // DCMOTOR_Forward(&LeftMotor, 0);
-            // DCMOTOR_Forward(&RightMotor, 0);
-            GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_HIGH); // Turn on LED when obstacle is detected
+            ClosestDistanceCm = BackDistanceCm;
+        }
+
+        if ((LeftDistanceCm != 0U) && ((ClosestDistanceCm == 0U) || (LeftDistanceCm < ClosestDistanceCm)))
+        {
+            ClosestDistanceCm = LeftDistanceCm;
+        }
+
+        if ((RightDistanceCm != 0U) && ((ClosestDistanceCm == 0U) || (RightDistanceCm < ClosestDistanceCm)))
+        {
+            ClosestDistanceCm = RightDistanceCm;
+        }
+
+        if ((ClosestDistanceCm != 0U) && (ClosestDistanceCm <= CAR_OBSTACLE_DISTANCE_CM))
+        {
+            // Considered an obstacle present
+            if (ObstacleState != CAR_OBSTACLE_STATE_DETECTED)
+            {
+                ObstacleState = CAR_OBSTACLE_STATE_DETECTED;
+                GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_HIGH); // Turn on LED when obstacle is detected
+            }
+
+            // Gradually decelerate to stop
+            Car_Accelerate(&LeftMotor, &RightMotor, &CurrentSpeed, &StopSpeed);
+            delay_ms(CAR_ACCELERATION_DELAY_MS);
         }
         else
         {
-            DCMOTOR_Forward(&LeftMotor, MotorSpeed);
-            DCMOTOR_Forward(&RightMotor, MotorSpeed);
-            GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_LOW); // Turn off LED when no obstacle is detected
-        }
+            // Considered clear
+            if (ObstacleState != CAR_OBSTACLE_STATE_CLEAR)
+            {
+                ObstacleState = CAR_OBSTACLE_STATE_CLEAR;
+                GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_LOW); // Turn off LED when no obstacle is detected
+            }
 
+            // Gradually accelerate back to original speed
+            Car_Accelerate(&LeftMotor, &RightMotor, &CurrentSpeed, &MotorSpeed);
+            delay_ms(CAR_ACCELERATION_DELAY_MS);
+        }
     }
 
     return 0;
