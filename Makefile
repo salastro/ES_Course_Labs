@@ -5,7 +5,7 @@ MCU = 16f877a
 CC = xc8-cc
 
 # DFP
-DFP = C:\Maro\ZC\Embedded\xc8\xc8\
+DFP = /opt/microchip/PIC16Fxxx_DFP/1.7.162/xc8
 
 # Target
 TARGET = app
@@ -56,7 +56,7 @@ $(TARGET).hex: $(SRCS)
 	$(CC) $(CFLAGS) -o $(TARGET).hex $(SRCS)
 
 flash: $(TARGET).hex
-	python -m picpro program -p COM5 -i $(TARGET).hex -t $(MCU)
+	picpro program -p /dev/ttyUSB0 -i $(TARGET).hex -t $(MCU)
 
 # Clean
 clean:
