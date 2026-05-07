@@ -14,23 +14,12 @@
 #include "../HAL/DC_MOTOR/DC_MOTOR_interface.h"
 #include "../HAL/ULTRASONIC/ULTRASONIC_interface.h"
 #include "../MCAL/PWM/PWM_interface.h"
+#include "../MCAL/INT_Manager/INT_Manager.h"
 #include "../SERVICES/STD_TYPES.h"
 #include "CAR/CAR_config.h"
 #include "CAR/CAR_interface.h"
 
-void delay_ms(u16 ms)
-{
-    unsigned int i, j;
-    for (i = 0; i < ms; i++)
-    {
-        const unsigned int iterations = 16000 / 4;
-        for (j = 0; j < iterations; j++)
-        {
-            // This loop creates a delay of approximately 1 ms at 16 MHz
-        }
-    }
-}
-
+/* Motor configuration */
 static DCMOTOR_t LeftMotor = {
     GPIO_PORTD, GPIO_PIN0, // In1
     GPIO_PORTD, GPIO_PIN1, // In2
@@ -45,45 +34,42 @@ static DCMOTOR_t RightMotor = {
     DCMOTOR_USE_PWM,
     PWM_CHANNEL2};
 
+/* Ultrasonic sensor configuration */
 static ULTRASONIC_t FrontSensor = {
-    GPIO_PORTB, GPIO_PIN4, // Trigger
+    GPIO_PORTB, GPIO_PIN4,  // Trigger
     GPIO_PORTB, GPIO_PIN5}; // Echo
 
 static ULTRASONIC_t BackSensor = {
-    GPIO_PORTB, GPIO_PIN6, // Trigger
+    GPIO_PORTB, GPIO_PIN6,  // Trigger
     GPIO_PORTB, GPIO_PIN7}; // Echo
 
 static ULTRASONIC_t LeftSensor = {
-    GPIO_PORTA, GPIO_PIN0, // Trigger
+    GPIO_PORTA, GPIO_PIN0,  // Trigger
     GPIO_PORTA, GPIO_PIN1}; // Echo
 
 static ULTRASONIC_t RightSensor = {
-    GPIO_PORTA, GPIO_PIN2, // Trigger
+    GPIO_PORTA, GPIO_PIN2,  // Trigger
     GPIO_PORTA, GPIO_PIN3}; // Echo
 
-
+/* LED configuration */
 #define LED_PORT GPIO_PORTB
 #define LED_PIN GPIO_PIN0
 
-// TODO: Debounce ultrasonic
+/* LED control callback for obstacle detection */
+static void CAR_LEDControl(u8 State)
+{
+    GPIO_SetPinValue(LED_PORT, LED_PIN, State ? GPIO_HIGH : GPIO_LOW);
+}
 
 int main(void)
 {
-    // Initial motor speed and state variables
     const u8 MotorSpeed = 100U;
     const u8 StopSpeed = 0U;
     u8 CurrentSpeed = MotorSpeed;
-    u16 FrontDistanceCm = 0U;
-    u16 BackDistanceCm = 0U;
-    u16 LeftDistanceCm = 0U;
-    u16 RightDistanceCm = 0U;
-    u16 ClosestDistanceCm = 0U;
     u8 ObstacleState = CAR_OBSTACLE_STATE_CLEAR;
 
-    // Initialize GPIO, motors, and ultrasonic sensors
+    /* Initialize hardware */
     GPIO_Init();
-
-    // LED for debugging
     GPIO_SetPinDirection(LED_PORT, LED_PIN, GPIO_OUTPUT);
     GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_LOW);
 
@@ -94,59 +80,26 @@ int main(void)
     ULTRASONIC_Init(&LeftSensor);
     ULTRASONIC_Init(&RightSensor);
 
+    /* Initialize interrupt-driven ultrasonic measurements and enable interrupts */
+    ULTRASONIC_InitMeasurementSystem(&FrontSensor, &BackSensor, &LeftSensor, &RightSensor);
+    IntManager_Init();
+
+    /* Initialize autonomous obstacle avoidance (interrupt-driven) */
+    Car_InitAutonomousMode(&LeftMotor, &RightMotor,
+                           &CurrentSpeed, &MotorSpeed, &StopSpeed, &ObstacleState,
+                           &FrontSensor, &BackSensor, &LeftSensor, &RightSensor,
+                           CAR_LEDControl);
+
+    /* Start moving forward */
     DCMOTOR_Forward(&LeftMotor, CurrentSpeed);
     DCMOTOR_Forward(&RightMotor, CurrentSpeed);
 
+    /* Main loop is now event-driven via interrupts */
+    /* Obstacle detection happens every 100ms via TIMER0 interrupt */
     while (1)
     {
-        FrontDistanceCm = ULTRASONIC_GetDistanceCm(&FrontSensor);
-        BackDistanceCm = ULTRASONIC_GetDistanceCm(&BackSensor);
-        LeftDistanceCm = ULTRASONIC_GetDistanceCm(&LeftSensor);
-        RightDistanceCm = ULTRASONIC_GetDistanceCm(&RightSensor);
-
-        ClosestDistanceCm = FrontDistanceCm;
-
-        if ((BackDistanceCm != 0U) && ((ClosestDistanceCm == 0U) || (BackDistanceCm < ClosestDistanceCm)))
-        {
-            ClosestDistanceCm = BackDistanceCm;
-        }
-
-        if ((LeftDistanceCm != 0U) && ((ClosestDistanceCm == 0U) || (LeftDistanceCm < ClosestDistanceCm)))
-        {
-            ClosestDistanceCm = LeftDistanceCm;
-        }
-
-        if ((RightDistanceCm != 0U) && ((ClosestDistanceCm == 0U) || (RightDistanceCm < ClosestDistanceCm)))
-        {
-            ClosestDistanceCm = RightDistanceCm;
-        }
-
-        if ((ClosestDistanceCm != 0U) && (ClosestDistanceCm <= CAR_OBSTACLE_DISTANCE_CM))
-        {
-            // Considered an obstacle present
-            if (ObstacleState != CAR_OBSTACLE_STATE_DETECTED)
-            {
-                ObstacleState = CAR_OBSTACLE_STATE_DETECTED;
-                GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_HIGH); // Turn on LED when obstacle is detected
-            }
-
-            // Gradually decelerate to stop
-            Car_Accelerate(&LeftMotor, &RightMotor, &CurrentSpeed, &StopSpeed);
-            delay_ms(CAR_ACCELERATION_DELAY_MS);
-        }
-        else
-        {
-            // Considered clear
-            if (ObstacleState != CAR_OBSTACLE_STATE_CLEAR)
-            {
-                ObstacleState = CAR_OBSTACLE_STATE_CLEAR;
-                GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_LOW); // Turn off LED when no obstacle is detected
-            }
-
-            // Gradually accelerate back to original speed
-            Car_Accelerate(&LeftMotor, &RightMotor, &CurrentSpeed, &MotorSpeed);
-            delay_ms(CAR_ACCELERATION_DELAY_MS);
-        }
+        /* Idle - all processing done in interrupts */
+        /* System can enter sleep mode or handle other tasks here */
     }
 
     return 0;

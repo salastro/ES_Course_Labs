@@ -23,13 +23,16 @@
 
 /* Function Pointers */
 typedef void (*TIMER0_CallbackFuncPtr)(void);
+typedef void (*TIMER0_PeriodicTaskFuncPtr)(void);
 
 /* Function Prototypes */
 void TIMER0_Init(u8 Mode, u8 Prescaler, u8 IntEnable);
 void TIMER0_SetValue(u8 TimerValue);
 u8 TIMER0_GetValue(void);
 void TIMER0_SetCallback(TIMER0_CallbackFuncPtr Copy_Ptr);
+void TIMER0_SetPeriodicTask(TIMER0_PeriodicTaskFuncPtr Copy_Ptr, u16 IntervalMs);
 void TIMER0_Start(void);
 void TIMER0_Stop(void);
 void TIMER0_InterruptHandler(void); /* Called from INT_Manager */
+u16 TIMER0_GetSystemMs(void);       /* Get elapsed milliseconds since system start */
 #endif
