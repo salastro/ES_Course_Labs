@@ -5,11 +5,6 @@
 
 static TIMER0_CallbackFuncPtr TIMER0_CallbackFunc = NULL_PTR;
 
-/* Periodic task system */
-static TIMER0_PeriodicTaskFuncPtr TIMER0_PeriodicTaskFunc = NULL_PTR;
-static u16 TIMER0_PeriodicTaskInterval = 0U;
-static u16 TIMER0_PeriodicTaskLastMs = 0U;
-
 /* Millisecond timing counter for system-wide use */
 static u16 TIMER0_SystemMs = 0U;
 static u8 TIMER0_MsCounter = 0U;
@@ -53,16 +48,6 @@ void TIMER0_SetCallback(TIMER0_CallbackFuncPtr Copy_Ptr)
         TIMER0_CallbackFunc = Copy_Ptr;
 }
 
-void TIMER0_SetPeriodicTask(TIMER0_PeriodicTaskFuncPtr Copy_Ptr, u16 IntervalMs)
-{
-    if (Copy_Ptr != NULL_PTR)
-    {
-        TIMER0_PeriodicTaskFunc = Copy_Ptr;
-        TIMER0_PeriodicTaskInterval = IntervalMs;
-        TIMER0_PeriodicTaskLastMs = TIMER0_SystemMs;
-    }
-}
-
 void TIMER0_Start(void)
 {
     /* Timer0 starts immediately after configuration */
@@ -83,20 +68,8 @@ void TIMER0_InterruptHandler(void)
         TIMER0_SystemMs++;
     }
 
-    /* Call primary callback if registered */
     if (TIMER0_CallbackFunc != NULL_PTR)
         TIMER0_CallbackFunc();
-
-    /* Check if periodic task interval has elapsed */
-    if (TIMER0_PeriodicTaskFunc != NULL_PTR)
-    {
-        u16 ElapsedMs = TIMER0_SystemMs - TIMER0_PeriodicTaskLastMs;
-        if (ElapsedMs >= TIMER0_PeriodicTaskInterval)
-        {
-            TIMER0_PeriodicTaskLastMs = TIMER0_SystemMs;
-            TIMER0_PeriodicTaskFunc();
-        }
-    }
 }
 
 /* Get elapsed milliseconds since system start */

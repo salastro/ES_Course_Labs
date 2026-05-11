@@ -55,11 +55,8 @@ static ULTRASONIC_t RightSensor = {
 #define LED_PORT GPIO_PORTB
 #define LED_PIN GPIO_PIN0
 
-/* LED control callback for obstacle detection */
-static void CAR_LEDControl(u8 State)
-{
-    GPIO_SetPinValue(LED_PORT, LED_PIN, State ? GPIO_HIGH : GPIO_LOW);
-}
+/* Non-blocking acceleration timing counter */
+static u16 AccelerationTick = 0U;
 
 int main(void)
 {
@@ -67,6 +64,7 @@ int main(void)
     const u8 StopSpeed = 0U;
     u8 CurrentSpeed = MotorSpeed;
     u8 ObstacleState = CAR_OBSTACLE_STATE_CLEAR;
+    u16 ClosestDistanceCm = 0U;
 
     /* Initialize hardware */
     GPIO_Init();
@@ -84,22 +82,59 @@ int main(void)
     ULTRASONIC_InitMeasurementSystem(&FrontSensor, &BackSensor, &LeftSensor, &RightSensor);
     IntManager_Init();
 
-    /* Initialize autonomous obstacle avoidance (interrupt-driven) */
-    Car_InitAutonomousMode(&LeftMotor, &RightMotor,
-                           &CurrentSpeed, &MotorSpeed, &StopSpeed, &ObstacleState,
-                           &FrontSensor, &BackSensor, &LeftSensor, &RightSensor,
-                           CAR_LEDControl);
-
     /* Start moving forward */
     DCMOTOR_Forward(&LeftMotor, CurrentSpeed);
     DCMOTOR_Forward(&RightMotor, CurrentSpeed);
 
-    /* Main loop is now event-driven via interrupts */
-    /* Obstacle detection happens every 100ms via TIMER0 interrupt */
     while (1)
     {
-        /* Idle - all processing done in interrupts */
-        /* System can enter sleep mode or handle other tasks here */
+        /* Find closest obstacle (non-blocking sensor reads) */
+        u16 distances[4] = {
+            ULTRASONIC_GetDistanceCm(&FrontSensor),
+            ULTRASONIC_GetDistanceCm(&BackSensor),
+            ULTRASONIC_GetDistanceCm(&LeftSensor),
+            ULTRASONIC_GetDistanceCm(&RightSensor)};
+
+        /* Find minimum non-zero distance */
+        ClosestDistanceCm = 0U;
+        for (u8 i = 0; i < 4; i++)
+        {
+            if (distances[i] != 0U)
+            {
+                if (ClosestDistanceCm == 0U || distances[i] < ClosestDistanceCm)
+                {
+                    ClosestDistanceCm = distances[i];
+                }
+            }
+        }
+
+        /* Non-blocking acceleration timing */
+        if (++AccelerationTick >= CAR_ACCELERATION_DELAY_MS)
+        {
+            AccelerationTick = 0U;
+
+            /* Obstacle detection logic */
+            if ((ClosestDistanceCm != 0U) && (ClosestDistanceCm <= CAR_OBSTACLE_DISTANCE_CM))
+            {
+                /* Obstacle detected */
+                if (ObstacleState != CAR_OBSTACLE_STATE_DETECTED)
+                {
+                    ObstacleState = CAR_OBSTACLE_STATE_DETECTED;
+                    GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_HIGH);
+                }
+                Car_Accelerate(&LeftMotor, &RightMotor, &CurrentSpeed, &StopSpeed);
+            }
+            else
+            {
+                /* Path clear */
+                if (ObstacleState != CAR_OBSTACLE_STATE_CLEAR)
+                {
+                    ObstacleState = CAR_OBSTACLE_STATE_CLEAR;
+                    GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_LOW);
+                }
+                Car_Accelerate(&LeftMotor, &RightMotor, &CurrentSpeed, &MotorSpeed);
+            }
+        }
     }
 
     return 0;
