@@ -14,7 +14,9 @@
 #include "../HAL/DC_MOTOR/DC_MOTOR_interface.h"
 #include "../HAL/ULTRASONIC/ULTRASONIC_interface.h"
 #include "../MCAL/PWM/PWM_interface.h"
+#include "../MCAL/UART/UART_interface.h"
 #include "../SERVICES/STD_TYPES.h"
+#include <xc.h>
 
 void delay_ms(u16 ms)
 {
@@ -64,6 +66,96 @@ static ULTRASONIC_t LeftSensor = {
 #define LED_PORT GPIO_PORTA
 #define LED_PIN GPIO_PIN0
 
+static u8 ClampSpeed(u16 SpeedPercent)
+{
+    if (SpeedPercent > 100U)
+    {
+        return 100U;
+    }
+
+    return (u8)SpeedPercent;
+}
+
+static void UART_SendUnsignedDecimal(u16 Value)
+{
+    u8 Digits[5];
+    u8 DigitCount = 0U;
+
+    if (Value == 0U)
+    {
+        UART_SendByte('0');
+        return;
+    }
+
+    while ((Value > 0U) && (DigitCount < 5U))
+    {
+        Digits[DigitCount] = (u8)('0' + (Value % 10U));
+        Value /= 10U;
+        DigitCount++;
+    }
+
+    while (DigitCount > 0U)
+    {
+        DigitCount--;
+        UART_SendByte(Digits[DigitCount]);
+    }
+}
+
+static void UART_SendDistanceReport(u16 FrontDistanceCm,
+                                    u16 BackDistanceCm,
+                                    u16 RightDistanceCm,
+                                    u16 LeftDistanceCm,
+                                    u8 MotorSpeed)
+{
+    UART_SendString((u8 *)"F:");
+    UART_SendUnsignedDecimal(FrontDistanceCm);
+    UART_SendString((u8 *)"cm B:");
+    UART_SendUnsignedDecimal(BackDistanceCm);
+    UART_SendString((u8 *)"cm R:");
+    UART_SendUnsignedDecimal(RightDistanceCm);
+    UART_SendString((u8 *)"cm L:");
+    UART_SendUnsignedDecimal(LeftDistanceCm);
+    UART_SendString((u8 *)"cm S:");
+    UART_SendUnsignedDecimal(MotorSpeed);
+    UART_SendString((u8 *)"%\r\n");
+}
+
+static void UART_ProcessSpeedCommand(u8 *MotorSpeed)
+{
+    static u16 ReceivedValue = 0U;
+    static u8 ReceivingValue = 0U;
+
+    while (UART_GetRXStatus() != 0U)
+    {
+        u8 ReceivedByte = UART_ReceiveByte();
+
+        if ((ReceivedByte >= (u8)'0') && (ReceivedByte <= (u8)'9'))
+        {
+            if (ReceivingValue == 0U)
+            {
+                ReceivedValue = 0U;
+                ReceivingValue = 1U;
+            }
+
+            ReceivedValue = (u16)(ReceivedValue * 10U) + (u16)(ReceivedByte - (u8)'0');
+        }
+        else if ((ReceivedByte == (u8)'\r') || (ReceivedByte == (u8)'\n'))
+        {
+            if (ReceivingValue != 0U)
+            {
+                *MotorSpeed = ClampSpeed(ReceivedValue);
+                ReceivedValue = 0U;
+                ReceivingValue = 0U;
+            }
+        }
+        else
+        {
+            ReceivedValue = 0U;
+            ReceivingValue = 0U;
+        }
+    }
+}
+
 int main(void)
 {
     u8 MotorSpeed = 75U;
@@ -75,6 +167,8 @@ int main(void)
     // Initialize GPIO, motors, and ultrasonic sensor
     GPIO_Init();
 
+    UART_Init(UART_BAUD_9600, UART_DATA_8BITS, UART_STOP_1BIT);
+
     // LED for debugging
     GPIO_SetPinDirection(LED_PORT, LED_PIN, GPIO_OUTPUT);
     GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_LOW);
@@ -85,8 +179,13 @@ int main(void)
     ULTRASONIC_Init(&BackSensor);
     ULTRASONIC_Init(&RightSensor);
     ULTRASONIC_Init(&LeftSensor);
+
+    // UART_SendString((u8 *)"Wheel speed command: send 0-100 and press Enter\r\n");
+
     while (1)
     {
+        UART_ProcessSpeedCommand(&MotorSpeed);
+
         DistanceCm = FrontDistanceCm = ULTRASONIC_GetDistanceCm(&FrontSensor);
         BackDistanceCm = ULTRASONIC_GetDistanceCm(&BackSensor);
         RightDistanceCm = ULTRASONIC_GetDistanceCm(&RightSensor);
@@ -112,6 +211,9 @@ int main(void)
             DCMOTOR_Forward(&RightMotor, MotorSpeed);
             GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_LOW); // Turn off LED when no obstacle is detected
         }
+
+        UART_SendDistanceReport(FrontDistanceCm, BackDistanceCm, RightDistanceCm, LeftDistanceCm, MotorSpeed);
+        __delay_ms(100U);
     }
 
     return 0;
