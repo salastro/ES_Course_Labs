@@ -44,19 +44,34 @@ static DCMOTOR_t RightMotor = {
     PWM_CHANNEL2};
 
 static ULTRASONIC_t FrontSensor = {
-    GPIO_PORTB, GPIO_PIN4, // Trigger
+    GPIO_PORTB, GPIO_PIN4,  // Trigger
     GPIO_PORTB, GPIO_PIN5}; // Echo
+
+static ULTRASONIC_t BackSensor = {
+    GPIO_PORTB, GPIO_PIN2,  // Trigger
+    GPIO_PORTB, GPIO_PIN3}; // Echo
+
+static ULTRASONIC_t RightSensor = {
+    GPIO_PORTB, GPIO_PIN6,  // Trigger
+    GPIO_PORTB, GPIO_PIN7}; // Echo
+
+static ULTRASONIC_t LeftSensor = {
+    GPIO_PORTB, GPIO_PIN0,  // Trigger
+    GPIO_PORTB, GPIO_PIN1}; // Echo
 
 #define OBSTACLE_DISTANCE_CM 10U
 
-#define LED_PORT GPIO_PORTB
+#define LED_PORT GPIO_PORTA
 #define LED_PIN GPIO_PIN0
 
 int main(void)
 {
     u8 MotorSpeed = 75U;
     u16 DistanceCm = 0U;
-
+    u16 FrontDistanceCm = 0U;
+    u16 BackDistanceCm = 0U;
+    u16 RightDistanceCm = 0U;
+    u16 LeftDistanceCm = 0U;
     // Initialize GPIO, motors, and ultrasonic sensor
     GPIO_Init();
 
@@ -67,18 +82,29 @@ int main(void)
     DCMOTOR_Init(&LeftMotor);
     DCMOTOR_Init(&RightMotor);
     ULTRASONIC_Init(&FrontSensor);
-
+    ULTRASONIC_Init(&BackSensor);
+    ULTRASONIC_Init(&RightSensor);
+    ULTRASONIC_Init(&LeftSensor);
     while (1)
     {
-        DistanceCm = ULTRASONIC_GetDistanceCm(&FrontSensor);
+        DistanceCm = FrontDistanceCm = ULTRASONIC_GetDistanceCm(&FrontSensor);
+        BackDistanceCm = ULTRASONIC_GetDistanceCm(&BackSensor);
+        RightDistanceCm = ULTRASONIC_GetDistanceCm(&RightSensor);
+        LeftDistanceCm = ULTRASONIC_GetDistanceCm(&LeftSensor);
 
-        if ((DistanceCm != 0U) && (DistanceCm >= OBSTACLE_DISTANCE_CM))
+        // Find the minimum distance from the three sensors
+        if (BackDistanceCm < DistanceCm)
+            DistanceCm = BackDistanceCm;
+        else if (RightDistanceCm < DistanceCm)
+            DistanceCm = RightDistanceCm;
+        else if (LeftDistanceCm < DistanceCm)
+            DistanceCm = LeftDistanceCm;
+
+        if ((DistanceCm != 0U) && (DistanceCm <= OBSTACLE_DISTANCE_CM))
         {
             DCMOTOR_Stop(&LeftMotor);
             DCMOTOR_Stop(&RightMotor);
-            // DCMOTOR_Forward(&LeftMotor, 0);
-            // DCMOTOR_Forward(&RightMotor, 0);
-            GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_HIGH); // Turn on LED when obstacle is detected
+            GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_HIGH);
         }
         else
         {
@@ -86,7 +112,6 @@ int main(void)
             DCMOTOR_Forward(&RightMotor, MotorSpeed);
             GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_LOW); // Turn off LED when no obstacle is detected
         }
-
     }
 
     return 0;
