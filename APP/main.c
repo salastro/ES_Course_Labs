@@ -12,7 +12,9 @@
 
 #include "../MCAL/GPIO/GPIO_interface.h"
 #include "../HAL/DC_MOTOR/DC_MOTOR_interface.h"
+#include "../HAL/LCD_I2C/LCD_I2C_interface.h"
 #include "../HAL/ULTRASONIC/ULTRASONIC_interface.h"
+#include "../MCAL/I2C/I2C_interface.h"
 #include "../MCAL/PWM/PWM_interface.h"
 #include "../SERVICES/STD_TYPES.h"
 
@@ -44,7 +46,7 @@ static DCMOTOR_t RightMotor = {
     PWM_CHANNEL2};
 
 static ULTRASONIC_t FrontSensor = {
-    GPIO_PORTB, GPIO_PIN4, // Trigger
+    GPIO_PORTB, GPIO_PIN4,  // Trigger
     GPIO_PORTB, GPIO_PIN5}; // Echo
 
 #define OBSTACLE_DISTANCE_CM 10U
@@ -55,10 +57,14 @@ static ULTRASONIC_t FrontSensor = {
 int main(void)
 {
     u8 MotorSpeed = 75U;
+    u8 CurrentSpeed = 0U;
     u16 DistanceCm = 0U;
 
-    // Initialize GPIO, motors, and ultrasonic sensor
+    // Initialize GPIO, I2C LCD, motors, and ultrasonic sensor
     GPIO_Init();
+    I2C_Init(I2C_MASTER, I2C_SPEED_100kHz);
+    LCD_I2C_Init();
+    LCD_I2C_Clear();
 
     // LED for debugging
     GPIO_SetPinDirection(LED_PORT, LED_PIN, GPIO_OUTPUT);
@@ -76,6 +82,7 @@ int main(void)
         {
             DCMOTOR_Stop(&LeftMotor);
             DCMOTOR_Stop(&RightMotor);
+            CurrentSpeed = 0U;
             // DCMOTOR_Forward(&LeftMotor, 0);
             // DCMOTOR_Forward(&RightMotor, 0);
             GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_HIGH); // Turn on LED when obstacle is detected
@@ -84,9 +91,21 @@ int main(void)
         {
             DCMOTOR_Forward(&LeftMotor, MotorSpeed);
             DCMOTOR_Forward(&RightMotor, MotorSpeed);
+            CurrentSpeed = MotorSpeed;
             GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_LOW); // Turn off LED when no obstacle is detected
         }
 
+        LCD_I2C_SetCursor(0U, 0U);
+        LCD_I2C_WriteString("Dist:");
+        LCD_I2C_WriteUnsignedPadded(DistanceCm, 4U);
+        LCD_I2C_WriteString("cm     ");
+
+        LCD_I2C_SetCursor(1U, 0U);
+        LCD_I2C_WriteString("Speed:");
+        LCD_I2C_WriteUnsignedPadded(CurrentSpeed, 3U);
+        LCD_I2C_WriteString("%      ");
+
+        delay_ms(100U);
     }
 
     return 0;
