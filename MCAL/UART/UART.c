@@ -9,13 +9,11 @@ static UART_TX_CallbackFuncPtr UART_TXCallbackFunc = NULL_PTR;
 void UART_Init(u16 BaudRate, u8 DataBits, u8 StopBits __attribute__((unused)))
 {
     u16 Local_SPBRValue = 0;
-    u8 Local_RCSTA = 0;
-    u8 Local_TXSTA = 0;
+    u8 Local_RCSTA = 0x90; /* SPEN=1, CREN=1 */
+    u8 Local_TXSTA = 0x24; /* BRGH=1, TXEN=1 */
 
     Local_SPBRValue = (u16)((UART_FOSC / (16 * (u32)BaudRate)) - 1);
     SPBRG = (u8)Local_SPBRValue;
-
-    Local_TXSTA = 0x24;
 
     if (DataBits == UART_DATA_9BITS)
     {
@@ -23,18 +21,19 @@ void UART_Init(u16 BaudRate, u8 DataBits, u8 StopBits __attribute__((unused)))
         SET_BIT(Local_TXSTA, TX9);
     }
 
-    Local_RCSTA = 0x90;
-
     RCSTA = Local_RCSTA;
     TXSTA = Local_TXSTA;
 
-    CLR_BIT(PIR1, RCIF);
-    CLR_BIT(PIR1, TXIF);
+    /* RC6(TX) output, RC7(RX) input */
+    CLR_BIT(TRISC, UART_TX_PIN);
+    SET_BIT(TRISC, UART_RX_PIN);
 
+    /* Enable only RX interrupt by default. TX interrupt is opt-in via callback. */
+    CLR_BIT(PIE1, TXIE);
     SET_BIT(PIE1, RCIE);
-    SET_BIT(PIE1, TXIE);
 
-    SET_BIT(INTCON, 7);
+    SET_BIT(INTCON, PEIE);
+    SET_BIT(INTCON, GIE);
 }
 
 void UART_SendByte(u8 Data)
@@ -73,7 +72,15 @@ void UART_SetRXCallback(UART_RX_CallbackFuncPtr Copy_Ptr)
 void UART_SetTXCallback(UART_TX_CallbackFuncPtr Copy_Ptr)
 {
     if (Copy_Ptr != NULL_PTR)
+    {
         UART_TXCallbackFunc = Copy_Ptr;
+        SET_BIT(PIE1, TXIE);
+    }
+    else
+    {
+        UART_TXCallbackFunc = NULL_PTR;
+        CLR_BIT(PIE1, TXIE);
+    }
 }
 
 u8 UART_GetRXStatus(void)

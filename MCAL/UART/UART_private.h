@@ -11,6 +11,7 @@
 #define PIR1 (*((volatile u8 *)0x0C))
 #define PIE1 (*((volatile u8 *)0x8C))
 #define INTCON (*((volatile u8 *)0x0B))
+#define TRISC (*((volatile u8 *)0x87))
 
 #define RX9D 0
 #define OERR 1
@@ -34,6 +35,12 @@
 
 #define RCIE 5
 #define TXIE 4
+
+#define PEIE 6
+#define GIE 7
+
+#define UART_TX_PIN 6
+#define UART_RX_PIN 7
 
 #define UART_FOSC 16000000UL
 
