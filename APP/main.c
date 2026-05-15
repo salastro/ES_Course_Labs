@@ -12,6 +12,7 @@
 #include "../MCAL/GPIO/GPIO_interface.h"
 #include "../MCAL/UART/UART_interface.h"
 #include "../SERVICES/STD_TYPES.h"
+#include <xc.h>
 
 /* LED تعريف */
 #define LED_PORT GPIO_PORTA
