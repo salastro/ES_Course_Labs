@@ -12,6 +12,8 @@
 #include "../MCAL/GPIO/GPIO_interface.h"
 #include "../MCAL/UART/UART_interface.h"
 #include "../SERVICES/STD_TYPES.h"
+#include "../MCAL/I2C/I2C_interface.h"
+#include "../HAL/LCD_I2C/LCD_I2C_interface.h"
 #include <xc.h>
 
 /* LED تعريف */
@@ -31,10 +33,14 @@ void CtrlLed(u8 data)
     if (data == '1')
     {
         GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_HIGH);
+        LCD_I2C_SetCursor(1, 0);
+        LCD_I2C_WriteString("LED ON ");
     }
     else if (data == '0')
     {
         GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_LOW);
+        LCD_I2C_SetCursor(1, 0);
+        LCD_I2C_WriteString("LED OFF");
     }
 }
 
@@ -42,20 +48,39 @@ void main(void)
 {
     /* Initialize GPIO */
     GPIO_Init();
+
+    /* Initialize LED */
     GPIO_SetPinDirection(LED_PORT, LED_PIN, GPIO_OUTPUT);
     GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_HIGH);
 
+    /* Initialize LCD */
+    I2C_Init(I2C_MASTER, I2C_SPEED_100kHz);
+    LCD_I2C_Init();
+    LCD_I2C_Clear();
+    LCD_I2C_SetCursor(0, 0);
+    LCD_I2C_WriteString("System Start");
+    __delay_ms(1000);
+    LCD_I2C_Clear();
+    LCD_I2C_SetCursor(0, 0);
+    LCD_I2C_WriteString("initiaizing UART");
     /* Initialize UART */
     UART_Init(UART_BAUD_9600, UART_DATA_8BITS, UART_STOP_1BIT);
     UART_SetRXCallback(CtrlLed);
 
+    __delay_ms(1000);
+    LCD_I2C_Clear();
+    LCD_I2C_SetCursor(0, 0);
     while (1)
     {
         /* Send HIGH every second */
         UART_SendByte('1');
+        LCD_I2C_SetCursor(0, 0);
+        LCD_I2C_WriteString("Sent: 1 ");
         delay_ms(1000);
 
         UART_SendByte('0');
+        LCD_I2C_SetCursor(0, 0);
+        LCD_I2C_WriteString("Sent: 0 ");
         delay_ms(1000);
     }
 }
