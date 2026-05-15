@@ -9,12 +9,12 @@
 
 #define _XTAL_FREQ 16000000
 
+#include <xc.h>
 #include "../MCAL/GPIO/GPIO_interface.h"
 #include "../MCAL/UART/UART_interface.h"
 #include "../SERVICES/STD_TYPES.h"
 #include "../MCAL/I2C/I2C_interface.h"
 #include "../HAL/LCD_I2C/LCD_I2C_interface.h"
-#include <xc.h>
 
 /* LED تعريف */
 #define LED_PORT GPIO_PORTA
@@ -49,23 +49,43 @@ void main(void)
     /* Initialize GPIO */
     GPIO_Init();
 
+    UART_Init(UART_BAUD_28800, UART_DATA_8BITS, UART_STOP_1BIT);
+    eeprom_write(0x00, 0x02);
+    UART_SetRXCallback(CtrlLed);
+    eeprom_write(0x00, 0x03);
+
     /* Initialize LED */
     GPIO_SetPinDirection(LED_PORT, LED_PIN, GPIO_OUTPUT);
     GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_HIGH);
+	__delay_ms(1000);
+    GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_LOW);
+	__delay_ms(1000);
 
     /* Initialize LCD */
     I2C_Init(I2C_MASTER, I2C_SPEED_100kHz);
     LCD_I2C_Init();
+    GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_HIGH);
     LCD_I2C_Clear();
     LCD_I2C_SetCursor(0, 0);
+	//u8 code = eeprom_read(0x01);
+	char text[6];
+	for (u8 i = 0; i < 6; i++){
+		text[i] = eeprom_read(i) + 48;
+	}
+	text[5] = 0;
+
+	LCD_I2C_WriteString(text);
+	__delay_ms(3000);
+
     LCD_I2C_WriteString("System Start");
+    eeprom_write(0x00, 0x00);
     __delay_ms(1000);
     LCD_I2C_Clear();
     LCD_I2C_SetCursor(0, 0);
     LCD_I2C_WriteString("initiaizing UART");
+    eeprom_write(0x00, 0x01);
+
     /* Initialize UART */
-    UART_Init(UART_BAUD_9600, UART_DATA_8BITS, UART_STOP_1BIT);
-    UART_SetRXCallback(CtrlLed);
 
     __delay_ms(1000);
     LCD_I2C_Clear();
