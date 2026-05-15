@@ -34,7 +34,6 @@ void I2C_Init(u8 Mode, u32 ClockSpeed)
     CLR_BIT(PIR1, SSPIF);
 
     SET_BIT(PIE1, SSPI);
-    SET_BIT(INTCON, 7);
 
     I2C_GlobalStatus = I2C_IDLE;
 }
