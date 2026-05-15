@@ -42,7 +42,7 @@ void main(void)
     /* Initialize GPIO */
     GPIO_Init();
     GPIO_SetPinDirection(LED_PORT, LED_PIN, GPIO_OUTPUT);
-    GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_LOW);
+    GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_HIGH);
 
     /* Initialize UART */
     UART_Init(UART_BAUD_9600, UART_DATA_8BITS, UART_STOP_1BIT);
