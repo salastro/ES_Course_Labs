@@ -13,7 +13,7 @@
 #include "../MCAL/GPIO/GPIO_interface.h"
 #include "../HAL/DC_MOTOR/DC_MOTOR_interface.h"
 #include "../HAL/ULTRASONIC/ULTRASONIC_interface.h"
-#include "../HAL/LCD_I2C/LCD_I2C_interface.h"
+#include "../HAL/LCD/LCD_interface.h"
 #include "../MCAL/I2C/I2C_interface.h"
 #include "../MCAL/PWM/PWM_interface.h"
 #include "../SERVICES/STD_TYPES.h"
@@ -47,20 +47,20 @@ void LCD_ShowData(u8 speed, u16 distance)
     char speedText[5];
     char distText[6];
 
-    LCD_I2C_Clear();
+    LCD_Clear();
 
-    LCD_I2C_SetCursor(0, 0);
-    LCD_I2C_WriteString("Speed: ");
+    LCD_SetCursor(0, 0);
+    LCD_WriteString("Speed: ");
 
     speedText[0] = (char)((speed / 10U) + '0');
     speedText[1] = (char)((speed % 10U) + '0');
     speedText[2] = '%';
     speedText[3] = '\0';
 
-    LCD_I2C_WriteString(speedText);
+    LCD_WriteString(speedText);
 
-    LCD_I2C_SetCursor(1, 0);
-    LCD_I2C_WriteString("Dist: ");
+    LCD_SetCursor(1, 0);
+    LCD_WriteString("Dist: ");
 
     if (distance >= 100U)
     {
@@ -81,8 +81,8 @@ void LCD_ShowData(u8 speed, u16 distance)
         distText[1] = '\0';
     }
 
-    LCD_I2C_WriteString(distText);
-    LCD_I2C_WriteString(" cm");
+    LCD_WriteString(distText);
+    LCD_WriteString(" cm");
 }
 
 int main(void)
@@ -97,15 +97,15 @@ int main(void)
     GPIO_SetPinValue(LED_PORT, LED_PIN, GPIO_LOW);
 
     I2C_Init(I2C_MASTER, I2C_SPEED_100kHz);
-    LCD_I2C_Init();
-    LCD_I2C_Clear();
+    LCD_Init();
+    LCD_Clear();
 
     DCMOTOR_Init(&LeftMotor);
     DCMOTOR_Init(&RightMotor);
     ULTRASONIC_Init(&FrontSensor);
 
-    LCD_I2C_SetCursor(0, 0);
-    LCD_I2C_WriteString("System Start");
+    LCD_SetCursor(0, 0);
+    LCD_WriteString("System Start");
     __delay_ms(1000);
 
     while (1)
@@ -113,14 +113,14 @@ int main(void)
         DistanceCm = ULTRASONIC_GetDistanceCm(&FrontSensor);
 
         // LCD_ShowData(MotorSpeed, DistanceCm);
-        LCD_I2C_Clear();
-        LCD_I2C_SetCursor(0, 0);
+        LCD_Clear();
+        LCD_SetCursor(0, 0);
 
         distText[0] = (char)((DistanceCm / 10U) + '0');
         distText[1] = (char)((DistanceCm % 10U) + '0');
         distText[2] = '\0';
-        LCD_I2C_WriteString(distText);
-        LCD_I2C_WriteString(" cm");
+        LCD_WriteString(distText);
+        LCD_WriteString(" cm");
 
         if ((DistanceCm != 0U) && (DistanceCm <= OBSTACLE_DISTANCE_CM))
         {
