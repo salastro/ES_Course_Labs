@@ -13,6 +13,7 @@ TARGET = app
 # Source files
 SRCS = \
 APP/main.c \
+HAL/IR/IR.c \
 HAL/LED/LED.c \
 HAL/DC_MOTOR/DC_MOTOR.c \
 HAL/ULTRASONIC/ULTRASONIC.c \
@@ -29,6 +30,7 @@ MCAL/I2C/I2C.c
 # Include directories
 INCLUDES = \
 -IAPP \
+-IHAL/IR \
 -IHAL/LED \
 -IHAL/DC_MOTOR \
 -IHAL/ULTRASONIC \

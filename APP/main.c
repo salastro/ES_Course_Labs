@@ -12,6 +12,7 @@
 
 #include "../MCAL/GPIO/GPIO_interface.h"
 #include "../HAL/DC_MOTOR/DC_MOTOR_interface.h"
+#include "../HAL/IR/IR_interface.h"
 #include "../HAL/ULTRASONIC/ULTRASONIC_interface.h"
 #include "../MCAL/PWM/PWM_interface.h"
 #include "../MCAL/UART/UART_interface.h"
@@ -23,13 +24,14 @@ void delay_ms(u16 ms)
     unsigned int i, j;
     for (i = 0; i < ms; i++)
     {
-        const unsigned int iterations = 16000 / 4;
-        for (j = 0; j < iterations; j++)
+        for (j = 0; j < 165; j++)
         {
-            // This loop creates a delay of approximately 1 ms at 16 MHz
+            __asm("nop");
         }
     }
 }
+
+#define DEFAULT_MOTOR_SPEED_PERCENT 60U
 
 static DCMOTOR_t LeftMotor = {
     GPIO_PORTD, GPIO_PIN0, // In1
@@ -61,7 +63,8 @@ static ULTRASONIC_t LeftSensor = {
     GPIO_PORTB, GPIO_PIN0,  // Trigger
     GPIO_PORTB, GPIO_PIN1}; // Echo
 
-#define OBSTACLE_DISTANCE_CM 10U
+static IR_t TrackSensor = {
+    GPIO_PORTA, GPIO_PIN4};
 
 // RED LED (Stopping/slowing down)
 #define RED_LED_PORT GPIO_PORTA
@@ -82,100 +85,187 @@ static ULTRASONIC_t LeftSensor = {
 static u8 ClampSpeed(u16 SpeedPercent)
 {
     if (SpeedPercent > 100U)
+    {
         return 100U;
+    }
+
     return (u8)SpeedPercent;
 }
 
-u8 atoi(u8 *str)
+static void UART_SendUint(u16 Value)
 {
-    u8 result = 0;
-    while (*str >= '0' && *str <= '9')
+    u8 Buffer[5];
+    u8 Index = 0U;
+
+    if (Value == 0U)
     {
-        result = result * 10 + (*str - '0');
-        str++;
+        UART_SendByte('0');
+        return;
     }
-    return result;
+
+    while (Value > 0U)
+    {
+        Buffer[Index] = (u8)((Value % 10U) + '0');
+        Value /= 10U;
+        Index++;
+    }
+
+    while (Index > 0U)
+    {
+        Index--;
+        UART_SendByte(Buffer[Index]);
+    }
 }
 
-void UART_CAR_SpeedCallback(u8 data)
+static void UART_SendDistance(u16 DistanceCm)
 {
-    // Convert received string to integer
-    u8 ReceivedSpeed = atoi(&data);
-    u8 ClampedSpeed = ClampSpeed(ReceivedSpeed);
+    UART_SendUint(DistanceCm);
+    UART_SendString((u8 *)".00");
+}
 
-    // Set motor speed using PWM
-    DCMOTOR_SetSpeed(&LeftMotor, ClampedSpeed);
-    DCMOTOR_SetSpeed(&RightMotor, ClampedSpeed);
+static void UART_SendSensorCsv(void)
+{
+    u16 FrontDistanceCm = ULTRASONIC_GetDistanceCm(&FrontSensor);
+    u16 BackDistanceCm = ULTRASONIC_GetDistanceCm(&BackSensor);
+    u16 LeftDistanceCm = ULTRASONIC_GetDistanceCm(&LeftSensor);
+    u16 RightDistanceCm = ULTRASONIC_GetDistanceCm(&RightSensor);
+
+    UART_SendDistance(FrontDistanceCm);
+    UART_SendByte(',');
+    UART_SendDistance(BackDistanceCm);
+    UART_SendByte(',');
+    UART_SendDistance(LeftDistanceCm);
+    UART_SendByte(',');
+    UART_SendDistance(RightDistanceCm);
+    UART_SendByte('\n');
+}
+
+static void UART_SendTrackStatus(void)
+{
+    if (IR_IsTrackDetected(&TrackSensor) != 0U)
+    {
+        UART_SendString((u8 *)"ON_TRACK\n");
+    }
+    else
+    {
+        UART_SendString((u8 *)"OFF_TRACK\n");
+    }
+}
+
+static void CAR_ApplyMotionCommand(u8 Command, u8 MotorSpeed)
+{
+    switch (Command)
+    {
+    case 'F':
+        DCMOTOR_Forward(&LeftMotor, MotorSpeed);
+        DCMOTOR_Forward(&RightMotor, MotorSpeed);
+        GPIO_SetPinValue(WHITE_LED_PORT, WHITE_LED_PIN, GPIO_HIGH);
+        GPIO_SetPinValue(YELLOW_LED_PORT_L, YELLOW_LED_PIN_L, GPIO_LOW);
+        GPIO_SetPinValue(YELLOW_LED_PORT_R, YELLOW_LED_PIN_R, GPIO_LOW);
+        GPIO_SetPinValue(RED_LED_PORT, RED_LED_PIN, GPIO_LOW);
+        break;
+
+    case 'B':
+        DCMOTOR_Reverse(&LeftMotor, MotorSpeed);
+        DCMOTOR_Reverse(&RightMotor, MotorSpeed);
+        GPIO_SetPinValue(WHITE_LED_PORT, WHITE_LED_PIN, GPIO_LOW);
+        GPIO_SetPinValue(YELLOW_LED_PORT_L, YELLOW_LED_PIN_L, GPIO_LOW);
+        GPIO_SetPinValue(YELLOW_LED_PORT_R, YELLOW_LED_PIN_R, GPIO_LOW);
+        GPIO_SetPinValue(RED_LED_PORT, RED_LED_PIN, GPIO_HIGH);
+        break;
+
+    case 'L':
+        DCMOTOR_Stop(&LeftMotor);
+        DCMOTOR_Forward(&RightMotor, MotorSpeed);
+        GPIO_SetPinValue(YELLOW_LED_PORT_L, YELLOW_LED_PIN_L, GPIO_HIGH);
+        GPIO_SetPinValue(YELLOW_LED_PORT_R, YELLOW_LED_PIN_R, GPIO_LOW);
+        GPIO_SetPinValue(WHITE_LED_PORT, WHITE_LED_PIN, GPIO_LOW);
+        GPIO_SetPinValue(RED_LED_PORT, RED_LED_PIN, GPIO_LOW);
+        break;
+
+    case 'R':
+        DCMOTOR_Forward(&LeftMotor, MotorSpeed);
+        DCMOTOR_Stop(&RightMotor);
+        GPIO_SetPinValue(YELLOW_LED_PORT_R, YELLOW_LED_PIN_R, GPIO_HIGH);
+        GPIO_SetPinValue(YELLOW_LED_PORT_L, YELLOW_LED_PIN_L, GPIO_LOW);
+        GPIO_SetPinValue(WHITE_LED_PORT, WHITE_LED_PIN, GPIO_LOW);
+        GPIO_SetPinValue(RED_LED_PORT, RED_LED_PIN, GPIO_LOW);
+        break;
+
+    case 'H':
+        /* No dedicated horn output, use red LED as a visible horn indicator pulse. */
+        GPIO_SetPinValue(RED_LED_PORT, RED_LED_PIN, GPIO_HIGH);
+        delay_ms(80U);
+        GPIO_SetPinValue(RED_LED_PORT, RED_LED_PIN, GPIO_LOW);
+        break;
+
+    case 'S':
+    default:
+        DCMOTOR_Stop(&LeftMotor);
+        DCMOTOR_Stop(&RightMotor);
+        GPIO_SetPinValue(WHITE_LED_PORT, WHITE_LED_PIN, GPIO_LOW);
+        GPIO_SetPinValue(YELLOW_LED_PORT_L, YELLOW_LED_PIN_L, GPIO_LOW);
+        GPIO_SetPinValue(YELLOW_LED_PORT_R, YELLOW_LED_PIN_R, GPIO_LOW);
+        GPIO_SetPinValue(RED_LED_PORT, RED_LED_PIN, GPIO_LOW);
+        break;
+    }
 }
 
 int main(void)
 {
-    u8 MotorSpeed = 0U;
-    u16 FrontDistanceCm = 0U;
-    u16 BackDistanceCm = 0U;
-    u16 RightDistanceCm = 0U;
-    u16 LeftDistanceCm = 0U;
+    u8 MotorSpeed = DEFAULT_MOTOR_SPEED_PERCENT;
+    u8 UART_Command = 'S';
 
     // Initialize GPIO, motors, and ultrasonic sensor
     GPIO_Init();
 
     // Initialize UART for PI
     UART_Init(UART_BAUD_9600, UART_DATA_8BITS, UART_STOP_1BIT);
-    UART_SetRXCallback(UART_CAR_SpeedCallback);
+    // UART_SetRXCallback(UART_CAR_SpeedCallback);
 
     // LED for debugging
     GPIO_SetPinDirection(RED_LED_PORT, RED_LED_PIN, GPIO_OUTPUT);
+    GPIO_SetPinDirection(YELLOW_LED_PORT_R, YELLOW_LED_PIN_R, GPIO_OUTPUT);
+    GPIO_SetPinDirection(YELLOW_LED_PORT_L, YELLOW_LED_PIN_L, GPIO_OUTPUT);
+    GPIO_SetPinDirection(WHITE_LED_PORT, WHITE_LED_PIN, GPIO_OUTPUT);
     GPIO_SetPinValue(RED_LED_PORT, RED_LED_PIN, GPIO_LOW);
+    GPIO_SetPinValue(YELLOW_LED_PORT_R, YELLOW_LED_PIN_R, GPIO_LOW);
+    GPIO_SetPinValue(YELLOW_LED_PORT_L, YELLOW_LED_PIN_L, GPIO_LOW);
+    GPIO_SetPinValue(WHITE_LED_PORT, WHITE_LED_PIN, GPIO_LOW);
 
     DCMOTOR_Init(&LeftMotor);
     DCMOTOR_Init(&RightMotor);
+    IR_Init(&TrackSensor);
     ULTRASONIC_Init(&FrontSensor);
     ULTRASONIC_Init(&BackSensor);
     ULTRASONIC_Init(&RightSensor);
     ULTRASONIC_Init(&LeftSensor);
 
+    CAR_ApplyMotionCommand('S', MotorSpeed);
+
     while (1)
     {
-        // Read distances from ultrasonic sensors
-        FrontDistanceCm = ULTRASONIC_GetDistanceCm(&FrontSensor);
-        BackDistanceCm = ULTRASONIC_GetDistanceCm(&BackSensor);
-        RightDistanceCm = ULTRASONIC_GetDistanceCm(&RightSensor);
-        LeftDistanceCm = ULTRASONIC_GetDistanceCm(&LeftSensor);
+        if (UART_GetRXStatus())
+        {
+            UART_Command = UART_ReceiveByte();
 
-        // Send distance data to PI via UART
-        UART_SendString((u8 *)"F: ");
-        UART_SendByte((u8)(FrontDistanceCm / 10) + '0'); // Send tens
-        UART_SendByte((u8)(FrontDistanceCm % 10) + '0'); // Send units
-        UART_SendString((u8 *)"\n");
-
-        UART_SendString((u8 *)"B: ");
-        UART_SendByte((u8)(BackDistanceCm / 10) + '0'); // Send tens
-        UART_SendByte(((u8)BackDistanceCm % 10) + '0'); // Send units
-        UART_SendString((u8 *)"\n");
-
-        UART_SendString((u8 *)"R: ");
-        UART_SendByte((u8)(RightDistanceCm / 10) + '0'); // Send tens
-        UART_SendByte(((u8)RightDistanceCm % 10) + '0'); // Send units
-        UART_SendString((u8 *)"\n");
-
-        UART_SendString((u8 *)"L: ");
-        UART_SendByte((u8)(LeftDistanceCm / 10) + '0'); // Send tens
-        UART_SendByte(((u8)LeftDistanceCm % 10) + '0'); // Send units
-        UART_SendString((u8 *)"\n");
-
-        // Send speed
-        UART_SendString((u8 *)"S: ");
-        UART_SendByte((u8)(MotorSpeed / 10) + '0'); // Send tens
-        UART_SendByte(((u8)MotorSpeed % 10) + '0'); // Send units
-        UART_SendString((u8 *)"\n");
-
-        // // Simple obstacle avoidance logic
-        // if (FrontDistanceCm < OBSTACLE_DISTANCE_CM)
-        // {
-        //     DCMOTOR_Stop(&LeftMotor);
-        //     DCMOTOR_Stop(&RightMotor);
-        //     MotorSpeed = 0U;
-        // }
+            if (UART_Command == 'Q')
+            {
+                UART_SendSensorCsv();
+            }
+            else if (UART_Command == 'T')
+            {
+                UART_SendTrackStatus();
+            }
+            else if ((UART_Command >= '0') && (UART_Command <= '9'))
+            {
+                MotorSpeed = ClampSpeed((u16)(UART_Command - '0') * 10U);
+            }
+            else
+            {
+                CAR_ApplyMotionCommand(UART_Command, MotorSpeed);
+            }
+        }
     }
 
     return 0;
